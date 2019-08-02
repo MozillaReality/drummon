@@ -1,0 +1,130 @@
+service: nearspark
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  region: us-west-1
+  stage: ${opt:stage, 'dev'}
+  stackName: nearspark-${opt:stage, 'dev'}
+  timeout: 15
+  role: ${file(config.json):nearspark-iam-role}
+  deploymentBucket:
+    name: ${file(config.json):nearspark-bucket-id}
+  vpc:
+    securityGroupIds:
+      - ${file(config.json):nearspark-security-group}
+    subnetIds: ${file(config.json):nearspark-subnet-ids}
+  usagePlan:
+    quota:
+      limit: 10000000
+      period: MONTH
+  endpointType: private
+  resourcePolicy:
+    - Effect: Allow
+      Principal: "*"
+      Action: execute-api:Invoke
+      Resource:
+        - execute-api:/*/*/*
+      Condition:
+        StringEquals:
+          aws:sourceVpc: ${file(config.json):nearspark-vpc-id}
+
+functions:
+  thumbnail:
+    handler: index.handler
+    events:
+      - http:
+          method: get
+          path: "thumbnail/{url}"
+          request:
+            parameters:
+              paths:
+                url: true
+          contentHandling: CONVERT_TO_BINARY
+
+resources:
+  Resources:
+    NearsparkCloudfrontDNS:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        Name:
+          Fn::Join:
+            - "."
+            - - ${file(config.json):nearspark-dns-prefix}
+              - ${file(config.json):nearspark-domain}
+        HostedZoneId: ${file(config.json):nearspark-zone-id}
+        Type: A
+        AliasTarget:
+          DNSName:
+            Fn::GetAtt: [ NearsparkCloudfrontDistribution, DomainName ]
+            HostedZoneId: Z2FDTNDATAQYW2
+
+    NearsparkCloudfrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Origins:
+            - Id: ApiGateway
+              DomainName:
+                Fn::Join:
+                  - ""
+                  - - Ref: ApiGatewayRestApi
+                    - ".execute-api."
+                    - Ref: AWS::Region
+                    - ".amazonaws.com"
+              CustomOriginConfig:
+                HTTPPort: 80
+                HTTPSPort: 443
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols: [ "TLSv1", "TLSv1.1", "TLSv1.2" ]
+              OriginPath:
+                Fn::Join:
+                  - ""
+                  - - "/"
+                    - ${self:provider.stage}
+          Enabled: true
+          HttpVersion: http2
+          PriceClass: PriceClass_All
+          Aliases:
+            -
+              Fn::Join:
+                - ""
+                - - ${file(config.json):nearspark-dns-prefix}
+                  - ${file(config.json):nearspark-domain}
+          DefaultCacheBehavior:
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+            TargetOriginId: ApiGateway
+            ForwardedValues:
+              QueryString: true
+              Headers: []
+              Cookies:
+                Forward: none
+            ViewerProtocolPolicy: redirect-to-https
+            MinTTL: '0'
+            DefaultTTL: '3600'
+
+          ViewerCertificate:
+            AcmCertificateArn: ${file(config.json):nearspark-cert-arn}
+            SslSupportMethod: sni-only
+            # CloudFrontDefaultCertificate: 'true'
+
+plugins:
+  - serverless-offline
+  - serverless-apigw-binary
+  - serverless-apigwy-binary
+
+custom:
+  apigwBinary:
+    types:
+      - '*/*'
+
+Outputs:
+  NearsparkCloudfrontDistribution:
+    Value:
+      Fn::GetAtt: [ NearsparkCloudfrontDistribution, DomainName ]
