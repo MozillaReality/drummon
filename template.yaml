@@ -11,24 +11,24 @@ Resources:
     Properties:
       StageName: prod
       DefinitionBody:
-        swagger: 2.0
+        openapi: 3.0
         paths:
-          "/{url}":
+          "/{proxy+}":
             get:
-              consumes:
-                - "application/json"
-              parameters:
-                - name: url
-                  in: path
-                  required: true
+              x-amazon-apigateway-any-method:
+                name: proxy
+                in: path
+                required: true
+                schema:
                   type: string
+                uri:
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCorsProxyFunction.Arn}/invocations
               x-amazon-apigateway-integration:
                 httpMethod: GET
+                passthroughBehavior: when_no_match
                 type: aws_proxy
                 uri:
                   Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCorsProxyFunction.Arn}/invocations
-              requestTemplates:
-                "application/json": "{\"url\": \"$input.params('url')\"}"
 
   LambdaCorsProxyFunction:
     Type: AWS::Serverless::Function
@@ -39,6 +39,10 @@ Resources:
       MemorySize: 256
       Policies: AWSLambdaBasicExecutionRole
       Timeout: 30
+      Environment:
+        Variables:
+          ProxyHost: http://127.0.1.1
+          AllowedOrigins: https://hubs.mozilla.com
       Events:
         Proxy:
           Type: Api

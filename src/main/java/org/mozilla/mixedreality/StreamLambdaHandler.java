@@ -1,25 +1,17 @@
 package org.mozilla.mixedreality;
 
-import com.amazonaws.serverless.proxy.model.AwsProxyRequest;
-import com.amazonaws.serverless.proxy.model.AwsProxyResponse;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.amazonaws.serverless.proxy.internal.LambdaContainerHandler;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
@@ -30,65 +22,93 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 
 public class StreamLambdaHandler implements RequestStreamHandler {
-    private static JsonFactory jsonFactory = new JsonFactory();
-    
-    private String getHeader(HashMap headers, String header) {
-      for (Object key : headers.keySet()) {
-        if (key.toString().equalsIgnoreCase(header)) {
-          return headers.get(key).toString();
-        }
+  private static String ProxyHost = System.getenv("ProxyHost");
+  private static List<String> AllowedOrigins = Arrays.asList(System.getenv("AllowedOrigins").split(" "));
+  private static ObjectMapper ObjectMapper = new ObjectMapper();
+  private static Base64.Encoder Base64Encoder = Base64.getEncoder();
+  private static RequestConfig GetConfig = RequestConfig.custom().setRedirectsEnabled(false).build();
+
+  private HttpClient http = HttpClients.createDefault();
+
+  @Override
+  public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context) {
+    try {
+      HashMap args = ObjectMapper.readValue(inputStream, HashMap.class);
+      HashMap requestHeaders = (HashMap)args.get("headers");
+      String targetUrl = (String)((HashMap)args.get("pathParameters")).get("proxy");
+      String origin = getHeader(requestHeaders, "Origin");
+      OutputStream encodedStream = Base64Encoder.wrap(outputStream);
+
+      HttpGet get = new HttpGet(targetUrl);
+      get.setConfig(GetConfig);
+
+      for (Object k : requestHeaders.keySet()) {
+        String ks = k.toString();
+        if (ks.equalsIgnoreCase("origin")) continue;
+        get.addHeader(ks, requestHeaders.get(k).toString());
       }
-      
-      return null;
-    }
-    
-    private void removeHeader(HashMap headers, String header) {
-      Object foundHeader = null;
-      
-      for (Object key : headers.keySet()) {
-        if (key.toString().equalsIgnoreCase(header)) {
-          foundHeader = key;
-          break;
+
+      HttpResponse response = http.execute(get);
+      InputStream bodyStream = response.getEntity().getContent();
+      IOUtils.write(response.getStatusLine().toString(), encodedStream, "UTF-8");
+      IOUtils.write("\n", encodedStream);
+
+      for (Header h : response.getAllHeaders()) {
+        String name = h.getName().toLowerCase();
+        if (name.startsWith("access-control-")) continue;
+
+        if (name.equals("location")) {
+          IOUtils.write("Location: ", encodedStream, "UTF-8");
+          IOUtils.write(ProxyHost, encodedStream, "UTF-8");
+          IOUtils.write("/", encodedStream, "UTF-8");
+          IOUtils.write(h.getValue(), encodedStream, "UTF-8");
+        } else {
+          IOUtils.write(h.toString(), encodedStream, "UTF-8");
         }
+
+        IOUtils.write("\n", encodedStream);
       }
-      
-      if (foundHeader != null) {
-        headers.remove(foundHeader);
+
+      if (origin != null && AllowedOrigins.contains(origin)) {
+        IOUtils.write("Access-Control-Allow-Origin: ", encodedStream, "UTF-8");
+        IOUtils.write(origin, encodedStream, "UTF-8");
+        IOUtils.write("\n", encodedStream, "UTF-8");
+        IOUtils.write("Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n", encodedStream, "UTF-8");
+        IOUtils.write("Access-Control-Allow-Headers: Range\n", encodedStream, "UTF-8");
+        IOUtils.write("Access-Control-Expose-Headers: Accept-Ranges, Content-Encoding, Content-Length, Content-Range\n", encodedStream, "UTF-8");
+      }
+
+      IOUtils.write("Vary: Origin\n", encodedStream, "UTF-8");
+      IOUtils.write("X-Content-Type-Options: nosniff\n", encodedStream, "UTF-8");
+
+      IOUtils.copy(bodyStream, encodedStream, 1024 * 1024);
+
+      encodedStream.close();
+    } catch (IOException e) { }
+  }
+
+  private String getHeader(HashMap headers, String header) {
+    for (Object key : headers.keySet()) {
+      if (key.toString().equalsIgnoreCase(header)) {
+        return headers.get(key).toString();
       }
     }
-    
-    @Override
-    public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context) {
-      ObjectMapper objectMapper = new ObjectMapper();
-      try {
-        HashMap args = objectMapper.readValue(inputStream, HashMap.class);
-        HashMap requestHeaders = (HashMap)args.get("headers");
-        String targetUrl = (String)((HashMap)args.get("pathParameters")).get("url");
-        System.out.println("Target URL: " + targetUrl);
-        /*String origin = getHeader(requestHeaders, "Origin");
-        OutputStream encodedStream = Base64.getEncoder().wrap(outputStream);
-        HttpClient http = HttpClients.createDefault();
-        RequestConfig reqConfig = RequestConfig.custom().setRedirectsEnabled(false).build();
-        
-        HttpGet get = new HttpGet(targetUrl);
-        get.setConfig(reqConfig);
-        
-        for (Object k : requestHeaders.keySet()) {
-        	if (k.toString().equalsIgnoreCase("origin")) continue;
-        	get.addHeader(k.toString(), requestHeaders.get(k).toString());
-        }
-        
-        HttpResponse response = http.execute(get);
-        InputStream bodyStream = response.getEntity().getContent();
-        System.out.println(response.getStatusLine());
-        
-        for (Header h : response.getAllHeaders()) {
-        	System.out.println(h);
-        }
-        
-        encodedStream.close();*/
-    } catch (IOException e) {
-      System.out.println(e);
+
+    return null;
+  }
+
+  private void removeHeader(HashMap headers, String header) {
+    Object foundHeader = null;
+
+    for (Object key : headers.keySet()) {
+      if (key.toString().equalsIgnoreCase(header)) {
+        foundHeader = key;
+        break;
+      }
     }
+
+    if (foundHeader != null) {
+      headers.remove(foundHeader);
     }
+  }
 }
