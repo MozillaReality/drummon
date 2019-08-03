@@ -35,12 +35,12 @@ functions:
   proxy:
     handler: org.mozilla.mixedreality.Drummon::handleRequest
     environment:
-      proxyUrl:
+      ProxyUrl:
         Fn::Join:
           - ""
           - - ${file(config.json):drummon-dns-prefix}
             - ${file(config.json):drummon-domain}
-      allowedOrigins: "*"
+      AllowedOrigins: "*"
     events:
       - http:
           method: get
