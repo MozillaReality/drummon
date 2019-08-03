@@ -43,8 +43,10 @@ public class StreamLambdaHandler implements RequestStreamHandler {
       get.setConfig(GetConfig);
 
       for (Object k : requestHeaders.keySet()) {
-        String ks = k.toString();
-        if (ks.equalsIgnoreCase("origin")) continue;
+        String ks = k.toString().toLowerCase();
+        if (ks.equals("origin")) continue;
+        if (ks.equals("host")) continue;
+        if (ks.startsWith("x-forwarded-")) continue;
         get.addHeader(ks, requestHeaders.get(k).toString());
       }
 
