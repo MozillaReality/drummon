@@ -44,7 +44,11 @@ functions:
     events:
       - http:
           method: get
-          path: /
+          path: "/{proxy+}"
+          request:
+            parameters:
+              paths:
+                proxy: true
           contentHandling: CONVERT_TO_BINARY
 
 resources:
