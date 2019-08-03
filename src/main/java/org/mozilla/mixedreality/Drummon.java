@@ -53,7 +53,7 @@ public class Drummon implements RequestStreamHandler {
       HttpResponse response = http.execute(get);
       InputStream bodyStream = response.getEntity().getContent();
       IOUtils.write(response.getStatusLine().toString(), encodedStream, "UTF-8");
-      IOUtils.write("\n", encodedStream);
+      IOUtils.write("\r\n", encodedStream);
 
       for (Header h : response.getAllHeaders()) {
         String name = h.getName().toLowerCase();
@@ -68,20 +68,21 @@ public class Drummon implements RequestStreamHandler {
           IOUtils.write(h.toString(), encodedStream, "UTF-8");
         }
 
-        IOUtils.write("\n", encodedStream);
+        IOUtils.write("\r\n", encodedStream);
       }
 
       if (AllowedOrigins.contains("*") || (origin != null && AllowedOrigins.contains(origin))) {
         IOUtils.write("Access-Control-Allow-Origin: ", encodedStream, "UTF-8");
         IOUtils.write(origin, encodedStream, "UTF-8");
-        IOUtils.write("\n", encodedStream, "UTF-8");
-        IOUtils.write("Access-Control-Allow-Methods: GET, HEAD, OPTIONS\n", encodedStream, "UTF-8");
-        IOUtils.write("Access-Control-Allow-Headers: Range\n", encodedStream, "UTF-8");
-        IOUtils.write("Access-Control-Expose-Headers: Accept-Ranges, Content-Encoding, Content-Length, Content-Range\n", encodedStream, "UTF-8");
+        IOUtils.write("\r\n", encodedStream, "UTF-8");
+        IOUtils.write("Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n", encodedStream, "UTF-8");
+        IOUtils.write("Access-Control-Allow-Headers: Range\r\n", encodedStream, "UTF-8");
+        IOUtils.write("Access-Control-Expose-Headers: Accept-Ranges, Content-Encoding, Content-Length, Content-Range\r\n", encodedStream, "UTF-8");
       }
 
-      IOUtils.write("Vary: Origin\n", encodedStream, "UTF-8");
-      IOUtils.write("X-Content-Type-Options: nosniff\n", encodedStream, "UTF-8");
+      IOUtils.write("Vary: Origin\r\n", encodedStream, "UTF-8");
+      IOUtils.write("X-Content-Type-Options: nosniff\r\n", encodedStream, "UTF-8");
+      IOUtils.write("\r\n", encodedStream, "UTF-8");
 
       IOUtils.copy(bodyStream, encodedStream, 1024 * 1024);
 

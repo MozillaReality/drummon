@@ -1,5 +1,8 @@
 service: drummon
 
+package:
+  artifact: target/drummon-1.0-lambda-package.zip
+
 provider:
   name: aws
   runtime: java8
@@ -17,10 +20,10 @@ provider:
     subnetIds: ${file(config.json):drummon-subnet-ids}
   usagePlan:
     quota:
-      limit: 100000
+      limit: ${self:custom.quota.${opt:stage, 'dev'}}
       period: MONTH
     throttle:
-      rateLimit: 100
+      rateLimit: ${self:custom.rate.${opt:stage, 'dev'}}
   resourcePolicy:
     - Effect: Allow
       Principal: "*"
@@ -37,7 +40,7 @@ functions:
           - "."
           - - ${file(config.json):drummon-dns-prefix}
             - ${file(config.json):drummon-domain}
-      allowedOrigins: *
+      allowedOrigins: "*"
     events:
       - http:
           method: get
@@ -59,9 +62,9 @@ resources:
         AliasTarget:
           DNSName:
             Fn::GetAtt: [ DrummonCloudfrontDistribution, DomainName ]
-            HostedZoneId: Z2FDTNDATAQYW2
+          HostedZoneId: Z2FDTNDATAQYW2
 
-    drummonCloudfrontDistribution:
+    DrummonCloudfrontDistribution:
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -122,6 +125,12 @@ plugins:
   - serverless-apigwy-binary
 
 custom:
+  quota:
+    dev: 100000
+    prod: 1
+  rate:
+    dev: 100
+    prod: 1
   apigwBinary:
     types:
       - '*/*'
