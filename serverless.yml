@@ -1,65 +1,67 @@
-service: nearspark
+service: drummon
 
 provider:
   name: aws
-  runtime: nodejs10.x
+  runtime: java8
   region: us-west-1
   stage: ${opt:stage, 'dev'}
-  stackName: nearspark-${opt:stage, 'dev'}
-  timeout: 15
-  role: ${file(config.json):nearspark-iam-role}
+  stackName: drummon-${opt:stage, 'dev'}
+  timeout: 30
+  memorySize: 128
+  role: ${file(config.json):drummon-iam-role}
   deploymentBucket:
-    name: ${file(config.json):nearspark-bucket-id}
+    name: ${file(config.json):drummon-bucket-id}
   vpc:
     securityGroupIds:
-      - ${file(config.json):nearspark-security-group}
-    subnetIds: ${file(config.json):nearspark-subnet-ids}
+      - ${file(config.json):drummon-security-group}
+    subnetIds: ${file(config.json):drummon-subnet-ids}
   usagePlan:
     quota:
-      limit: 10000000
+      limit: 100000
       period: MONTH
-  endpointType: private
+    throttle:
+      rateLimit: 100
   resourcePolicy:
     - Effect: Allow
       Principal: "*"
       Action: execute-api:Invoke
       Resource:
         - execute-api:/*/*/*
-      Condition:
-        StringEquals:
-          aws:sourceVpc: ${file(config.json):nearspark-vpc-id}
 
 functions:
-  thumbnail:
-    handler: index.handler
+  proxy:
+    handler: org.mozilla.mixedreality.Drummon::handleRequest
+    environment:
+      proxyUrl:
+        Fn::Join:
+          - "."
+          - - ${file(config.json):drummon-dns-prefix}
+            - ${file(config.json):drummon-domain}
+      allowedOrigins: *
     events:
       - http:
           method: get
-          path: "thumbnail/{url}"
-          request:
-            parameters:
-              paths:
-                url: true
+          path: /
           contentHandling: CONVERT_TO_BINARY
 
 resources:
   Resources:
-    NearsparkCloudfrontDNS:
+    DrummonCloudfrontDNS:
       Type: AWS::Route53::RecordSet
       Properties:
         Name:
           Fn::Join:
             - "."
-            - - ${file(config.json):nearspark-dns-prefix}
-              - ${file(config.json):nearspark-domain}
-        HostedZoneId: ${file(config.json):nearspark-zone-id}
+            - - ${file(config.json):drummon-dns-prefix}
+              - ${file(config.json):drummon-domain}
+        HostedZoneId: ${file(config.json):drummon-zone-id}
         Type: A
         AliasTarget:
           DNSName:
-            Fn::GetAtt: [ NearsparkCloudfrontDistribution, DomainName ]
+            Fn::GetAtt: [ DrummonCloudfrontDistribution, DomainName ]
             HostedZoneId: Z2FDTNDATAQYW2
 
-    NearsparkCloudfrontDistribution:
+    drummonCloudfrontDistribution:
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -89,8 +91,8 @@ resources:
             -
               Fn::Join:
                 - ""
-                - - ${file(config.json):nearspark-dns-prefix}
-                  - ${file(config.json):nearspark-domain}
+                - - ${file(config.json):drummon-dns-prefix}
+                  - ${file(config.json):drummon-domain}
           DefaultCacheBehavior:
             AllowedMethods:
               - GET
@@ -110,7 +112,7 @@ resources:
             DefaultTTL: '3600'
 
           ViewerCertificate:
-            AcmCertificateArn: ${file(config.json):nearspark-cert-arn}
+            AcmCertificateArn: ${file(config.json):drummon-cert-arn}
             SslSupportMethod: sni-only
             # CloudFrontDefaultCertificate: 'true'
 
@@ -125,6 +127,6 @@ custom:
       - '*/*'
 
 Outputs:
-  NearsparkCloudfrontDistribution:
+  DrummonCloudfrontDistribution:
     Value:
-      Fn::GetAtt: [ NearsparkCloudfrontDistribution, DomainName ]
+      Fn::GetAtt: [ DrummonCloudfrontDistribution, DomainName ]

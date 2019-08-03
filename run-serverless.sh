@@ -27,7 +27,7 @@ ENVIRONMENT=$2
 
 DIR=$(pwd)
 pushd $HUBS_OPS_PATH/terraform
-./grunt_local.sh output nearspark $ENVIRONMENT -json | jq 'with_entries(.value |= .value)' > $DIR/config.json
+./grunt_local.sh output drummon $ENVIRONMENT -json | jq 'with_entries(.value |= .value)' > $DIR/config.json
 popd
 sls $COMMAND --stage $ENVIRONMENT
 rm config.json

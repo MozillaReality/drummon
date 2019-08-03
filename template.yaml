@@ -1,12 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: AWS Lambda CORS Proxy
+Description: Drummon CORS Proxy
 Globals:
   Function:
     Timeout: 30
 
 Resources:
-  LambdaCorsProxyApi:
+  DrummonApi:
     Type: AWS::Serverless::Api
     Properties:
       StageName: prod
@@ -22,15 +22,15 @@ Resources:
                 schema:
                   type: string
                 uri:
-                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCorsProxyFunction.Arn}/invocations
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DrummonFunction.Arn}/invocations
               x-amazon-apigateway-integration:
                 httpMethod: GET
                 passthroughBehavior: when_no_match
                 type: aws_proxy
                 uri:
-                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCorsProxyFunction.Arn}/invocations
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DrummonFunction.Arn}/invocations
 
-  LambdaCorsProxyFunction:
+  DrummonFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: org.mozilla.mixedreality.StreamLambdaHandler::handleRequest
@@ -50,10 +50,3 @@ Resources:
             Path: /
             Method: get
             ContentHandling: CONVERT_TO_BINARY
-
-Outputs:
-  LambdaCorsProxyApi:
-    Description: URL for application
-    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/ping'
-    Export:
-      Name: LambdaCorsProxyApi

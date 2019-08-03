@@ -21,7 +21,7 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 
-public class StreamLambdaHandler implements RequestStreamHandler {
+public class Drummon implements RequestStreamHandler {
   private static String ProxyHost = System.getenv("ProxyHost");
   private static List<String> AllowedOrigins = Arrays.asList(System.getenv("AllowedOrigins").split(" "));
   private static ObjectMapper ObjectMapper = new ObjectMapper();
