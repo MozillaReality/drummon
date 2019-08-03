@@ -37,7 +37,7 @@ functions:
     environment:
       proxyUrl:
         Fn::Join:
-          - "."
+          - ""
           - - ${file(config.json):drummon-dns-prefix}
             - ${file(config.json):drummon-domain}
       allowedOrigins: "*"
@@ -54,7 +54,7 @@ resources:
       Properties:
         Name:
           Fn::Join:
-            - "."
+            - ""
             - - ${file(config.json):drummon-dns-prefix}
               - ${file(config.json):drummon-domain}
         HostedZoneId: ${file(config.json):drummon-zone-id}
