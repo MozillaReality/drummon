@@ -71,7 +71,7 @@ public class StreamLambdaHandler implements RequestStreamHandler {
         IOUtils.write("\n", encodedStream);
       }
 
-      if (origin != null && AllowedOrigins.contains(origin)) {
+      if (AllowedOrigins.contains("*") || (origin != null && AllowedOrigins.contains(origin))) {
         IOUtils.write("Access-Control-Allow-Origin: ", encodedStream, "UTF-8");
         IOUtils.write(origin, encodedStream, "UTF-8");
         IOUtils.write("\n", encodedStream, "UTF-8");
