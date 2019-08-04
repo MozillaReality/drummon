@@ -29,13 +29,15 @@ Resources:
                 type: aws_proxy
                 uri:
                   Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DrummonFunction.Arn}/invocations
+              x-amazon-apigateway-binary-media-types:
+                - "*/*"
 
   DrummonFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: org.mozilla.mixedreality.StreamLambdaHandler::handleRequest
+      Handler: org.mozilla.mixedreality.Drummon::handleRequest
       Runtime: java8
-      CodeUri: target/lambda-cors-proxy-1.0-lambda-package.zip
+      CodeUri: target/drummon-1.0-lambda-package.zip
       MemorySize: 256
       Policies: AWSLambdaBasicExecutionRole
       Timeout: 30

@@ -35,7 +35,7 @@ functions:
   proxy:
     handler: org.mozilla.mixedreality.Drummon::handleRequest
     environment:
-      ProxyUrl:
+      ProxyHost:
         Fn::Join:
           - ""
           - - ${file(config.json):drummon-dns-prefix}

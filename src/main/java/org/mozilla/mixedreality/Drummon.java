@@ -22,16 +22,16 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 
 public class Drummon implements RequestStreamHandler {
-  private static String ProxyHost = System.getenv("ProxyHost");
-  private static List<String> AllowedOrigins = Arrays.asList(System.getenv("AllowedOrigins").split(" "));
-  private static ObjectMapper ObjectMapper = new ObjectMapper();
-  private static Base64.Encoder Base64Encoder = Base64.getEncoder();
-  private static RequestConfig GetConfig = RequestConfig.custom().setRedirectsEnabled(false).build();
-
-  private HttpClient http = HttpClients.createDefault();
-
   @Override
   public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context) {
+  String ProxyHost = System.getenv("ProxyHost");
+  List<String> AllowedOrigins = Arrays.asList(System.getenv("AllowedOrigins").split(" "));
+  ObjectMapper ObjectMapper = new ObjectMapper();
+  Base64.Encoder Base64Encoder = Base64.getEncoder();
+  RequestConfig GetConfig = RequestConfig.custom().setRedirectsEnabled(false).build();
+
+  HttpClient http = HttpClients.createDefault();
+
     try {
       HashMap args = ObjectMapper.readValue(inputStream, HashMap.class);
       HashMap requestHeaders = (HashMap)args.get("headers");
@@ -39,6 +39,7 @@ public class Drummon implements RequestStreamHandler {
       String origin = getHeader(requestHeaders, "Origin");
       OutputStream encodedStream = Base64Encoder.wrap(outputStream);
 
+      System.out.println("start");
       HttpGet get = new HttpGet(targetUrl);
       get.setConfig(GetConfig);
 
@@ -52,42 +53,116 @@ public class Drummon implements RequestStreamHandler {
 
       HttpResponse response = http.execute(get);
       InputStream bodyStream = response.getEntity().getContent();
-      IOUtils.write(response.getStatusLine().toString(), encodedStream, "UTF-8");
-      IOUtils.write("\r\n", encodedStream);
+      IOUtils.write("{ \"isBase64Encoded\": true, \"statusCode\": ", outputStream, "UTF-8");
+      IOUtils.write("" + response.getStatusLine().getStatusCode(), outputStream, "UTF-8");
+      IOUtils.write(", \"headers\": { ", outputStream, "UTF-8");
+      boolean startedHeaders = false;
 
       for (Header h : response.getAllHeaders()) {
         String name = h.getName().toLowerCase();
         if (name.startsWith("access-control-")) continue;
 
-        if (name.equals("location")) {
-          IOUtils.write("Location: ", encodedStream, "UTF-8");
-          IOUtils.write(ProxyHost, encodedStream, "UTF-8");
-          IOUtils.write("/", encodedStream, "UTF-8");
-          IOUtils.write(h.getValue(), encodedStream, "UTF-8");
-        } else {
-          IOUtils.write(h.toString(), encodedStream, "UTF-8");
+        if (startedHeaders) {
+          IOUtils.write(",", outputStream, "UTF-8");
         }
 
-        IOUtils.write("\r\n", encodedStream);
-      }
+        startedHeaders = true;
 
+        IOUtils.write("\"", outputStream, "UTF-8");
+        IOUtils.write(jsonEscaped(h.getName()), outputStream, "UTF-8");
+        IOUtils.write("\":\"", outputStream, "UTF-8");
+
+        if (name.equals("location")) {
+          IOUtils.write(jsonEscaped(ProxyHost), outputStream, "UTF-8");
+          IOUtils.write(jsonEscaped("/"), outputStream, "UTF-8");
+        }
+
+        IOUtils.write(jsonEscaped(h.getValue()), outputStream, "UTF-8");
+        IOUtils.write("\"", outputStream, "UTF-8");
+      }
       if (AllowedOrigins.contains("*") || (origin != null && AllowedOrigins.contains(origin))) {
-        IOUtils.write("Access-Control-Allow-Origin: ", encodedStream, "UTF-8");
-        IOUtils.write(origin, encodedStream, "UTF-8");
-        IOUtils.write("\r\n", encodedStream, "UTF-8");
-        IOUtils.write("Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n", encodedStream, "UTF-8");
-        IOUtils.write("Access-Control-Allow-Headers: Range\r\n", encodedStream, "UTF-8");
-        IOUtils.write("Access-Control-Expose-Headers: Accept-Ranges, Content-Encoding, Content-Length, Content-Range\r\n", encodedStream, "UTF-8");
+        if (startedHeaders) {
+          IOUtils.write(",", outputStream, "UTF-8");
+        }
+
+        startedHeaders = true;
+
+        IOUtils.write("\"Access-Control-Allow-Origin\": \"", outputStream, "UTF-8");
+        IOUtils.write(jsonEscaped(origin), outputStream, "UTF-8");
+        IOUtils.write("\", \"Access-Control-Allow-Methods\": \"GET, HEAD, OPTIONS\",", outputStream, "UTF-8");
+        IOUtils.write("\"Access-Control-Allow-Headers\": \"Range\",", outputStream, "UTF-8");
+        IOUtils.write("\"Access-Control-Expose-Headers\": \"Accept-Ranges, Content-Encoding, Content-Length, Content-Range\"", outputStream, "UTF-8");
       }
 
-      IOUtils.write("Vary: Origin\r\n", encodedStream, "UTF-8");
-      IOUtils.write("X-Content-Type-Options: nosniff\r\n", encodedStream, "UTF-8");
-      IOUtils.write("\r\n", encodedStream, "UTF-8");
+      if (startedHeaders) {
+        IOUtils.write(",", outputStream, "UTF-8");
+      }
+
+      startedHeaders = true;
+      IOUtils.write("\"Vary\": \"Origin\",", outputStream, "UTF-8");
+      IOUtils.write("\"X-Content-Type-Options\": \"nosniff\"", outputStream, "UTF-8");
+      System.out.println("body");
+      IOUtils.write("}, \"body\": \"", outputStream, "UTF-8");
 
       IOUtils.copy(bodyStream, encodedStream, 1024 * 1024);
+      System.out.println("flush");
+      encodedStream.flush();
+      IOUtils.write("\"}", outputStream, "UTF-8");
+      System.out.println("close");
+    } catch (IOException e) { 
+      e.printStackTrace();
+      System.out.println(e);
+    }
+  }
 
-      encodedStream.close();
-    } catch (IOException e) { }
+  private String jsonEscaped(String s) {
+    StringBuffer sb = new StringBuffer();
+    final int len = s.length();
+
+    for(int i=0;i<len;i++){
+      char ch=s.charAt(i);
+      switch(ch){
+      case '"':
+        sb.append("\\\"");
+        break;
+      case '\\':
+        sb.append("\\\\");
+        break;
+      case '\b':
+        sb.append("\\b");
+        break;
+      case '\f':
+        sb.append("\\f");
+        break;
+      case '\n':
+        sb.append("\\n");
+        break;
+      case '\r':
+        sb.append("\\r");
+        break;
+      case '\t':
+        sb.append("\\t");
+        break;
+      case '/':
+        sb.append("\\/");
+        break;
+      default:
+                //Reference: http://www.unicode.org/versions/Unicode5.1.0/
+        if((ch>='\u0000' && ch<='\u001F') || (ch>='\u007F' && ch<='\u009F') || (ch>='\u2000' && ch<='\u20FF')){
+          String ss=Integer.toHexString(ch);
+          sb.append("\\u");
+          for(int k=0;k<4-ss.length();k++){
+            sb.append('0');
+          }
+          sb.append(ss.toUpperCase());
+        }
+        else{
+          sb.append(ch);
+        }
+      }
+    }
+
+    return sb.toString();
   }
 
   private String getHeader(HashMap headers, String header) {
