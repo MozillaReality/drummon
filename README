@@ -3,7 +3,7 @@ This is a failed experiment to attempt generalized CORS proxying of arbitrary UR
 The main reasons:
 - To return binary data from a lambda, you need to pipe it through Base64 encoding, which is cumbersome and slow
 
-- Because lambda requires a JSON response, there's no method to stream the body, which is problematic for large responses. The implementation found here does try to minimize memory usage by streaming the body out inline, but it seems that the caller ends up buffering it into a JSON blob and hence the high watermark on memory use for the lambda is proportional to the response size.
+- Because lambda requires a JSON response, there's no method to stream the body, which is problematic for large responses since the entire response needs to be buffered into memory before being returned. The implementation found here does try to minimize memory usage by streaming the body out inline, but it seems that the caller ends up buffering it into a JSON blob and hence the high watermark on memory use for the lambda is proportional to the response size.
 
 - Lambda has a hard response size limit of a few megs, and the API Gateway imposes a timeout of 30s. Both of these are prohibitive to a general web proxy.
 
