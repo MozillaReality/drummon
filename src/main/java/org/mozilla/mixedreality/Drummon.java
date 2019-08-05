@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
@@ -22,24 +23,44 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 
 public class Drummon implements RequestStreamHandler {
+  private static String ProxyHost = System.getenv("ProxyHost");
+  private static List<String> AllowedOrigins = Arrays.asList(System.getenv("AllowedOrigins").split(" "));
+  private static ObjectMapper ObjectMapper = new ObjectMapper();
+  private static Base64.Encoder Base64Encoder = Base64.getEncoder();
+  private static RequestConfig GetConfig = RequestConfig.custom().setRedirectsEnabled(false).build();
+
+  private HttpClient http = HttpClients.createDefault();
+
   @Override
   public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context) {
-  String ProxyHost = System.getenv("ProxyHost");
-  List<String> AllowedOrigins = Arrays.asList(System.getenv("AllowedOrigins").split(" "));
-  ObjectMapper ObjectMapper = new ObjectMapper();
-  Base64.Encoder Base64Encoder = Base64.getEncoder();
-  RequestConfig GetConfig = RequestConfig.custom().setRedirectsEnabled(false).build();
-
-  HttpClient http = HttpClients.createDefault();
-
     try {
       HashMap args = ObjectMapper.readValue(inputStream, HashMap.class);
       HashMap requestHeaders = (HashMap)args.get("headers");
       String targetUrl = (String)((HashMap)args.get("pathParameters")).get("proxy");
+      HashMap queryParameters = (HashMap)args.get("multiValueQueryStringParameters");
+
+      boolean wroteQsArg = false;
+
+      for (Object k : queryParameters.keySet()) {
+        targetUrl = targetUrl + (wroteQsArg ? "&" : "?");
+        wroteQsArg = true;
+
+        List<String> vals = (List<String>)queryParameters.get(k);
+
+        if (vals.size() == 0) {
+          targetUrl = targetUrl + URLEncoder.encode(k.toString());
+        } else {
+          for (int i = 0; i < vals.size(); i++) {
+            targetUrl = targetUrl + URLEncoder.encode(k.toString()) + "=" + URLEncoder.encode(vals.get(i));
+          }
+        }
+      }
+
       String origin = getHeader(requestHeaders, "Origin");
       OutputStream encodedStream = Base64Encoder.wrap(outputStream);
 
-      System.out.println("start");
+      System.out.println(targetUrl);
+      System.out.println(args);
       HttpGet get = new HttpGet(targetUrl);
       get.setConfig(GetConfig);
 
@@ -80,7 +101,7 @@ public class Drummon implements RequestStreamHandler {
         IOUtils.write(jsonEscaped(h.getValue()), outputStream, "UTF-8");
         IOUtils.write("\"", outputStream, "UTF-8");
       }
-      if (AllowedOrigins.contains("*") || (origin != null && AllowedOrigins.contains(origin))) {
+      if (origin != null && (AllowedOrigins.contains("*") || AllowedOrigins.contains(origin))) {
         if (startedHeaders) {
           IOUtils.write(",", outputStream, "UTF-8");
         }
@@ -101,14 +122,11 @@ public class Drummon implements RequestStreamHandler {
       startedHeaders = true;
       IOUtils.write("\"Vary\": \"Origin\",", outputStream, "UTF-8");
       IOUtils.write("\"X-Content-Type-Options\": \"nosniff\"", outputStream, "UTF-8");
-      System.out.println("body");
       IOUtils.write("}, \"body\": \"", outputStream, "UTF-8");
 
       IOUtils.copy(bodyStream, encodedStream, 1024 * 1024);
-      System.out.println("flush");
       encodedStream.flush();
       IOUtils.write("\"}", outputStream, "UTF-8");
-      System.out.println("close");
     } catch (IOException e) { 
       e.printStackTrace();
       System.out.println(e);
