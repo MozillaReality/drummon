@@ -59,8 +59,6 @@ public class Drummon implements RequestStreamHandler {
       String origin = getHeader(requestHeaders, "Origin");
       OutputStream encodedStream = Base64Encoder.wrap(outputStream);
 
-      System.out.println(targetUrl);
-      System.out.println(args);
       HttpGet get = new HttpGet(targetUrl);
       get.setConfig(GetConfig);
 
