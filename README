@@ -1,4 +1,4 @@
-This is a failed experiment to attempt generalized CORS proxying of arbitrary URLs via AWS lambda. You can use this for CORS proxying a simple API as-is, but longer responses (such as binary blobs) will fail due to memory/response size limitations of lambda.
+This is a failed experiment to attempt generalized CORS proxying of arbitrary URLs via AWS lambda. You can use this for CORS proxying a simple API as-is, but longer responses (such as binary blobs) will fail due to memory/response size limitations of lambda. The API is the same as cors-anywhere.
 
 The main reasons:
 - To return binary data from a lambda, you need to pipe it through Base64 encoding, which is cumbersome and slow
